@@ -44,10 +44,10 @@ improvement_cost_per_row = st.sidebar.number_input(
 
 effectiveness = st.sidebar.slider(
     "Method effectiveness (%)",
-    min_value=1,
+    min_value=0,
     max_value=100,
     value=90,
-    step=1
+    step=5
 ) / 100
 
 rows_per_hour = st.sidebar.number_input(
@@ -81,18 +81,18 @@ selection_overhead_factor = st.sidebar.slider(
     step=0.05
 )
 
-bulk_human_work = st.sidebar.number_input(
-    "Bulk human work (min)",
+human_work_per_1000_rows = st.sidebar.number_input(
+    "Human work per 1000 rows (min)",
     min_value=0.0,
-    value=20.0,
-    step=1.0
+    value=1.0,
+    step=0.5
 )
 
-progressive_human_work = st.sidebar.number_input(
-    "Progressive human work (min)",
+iteration_human_overhead = st.sidebar.number_input(
+    "Human work per progressive iteration (min)",
     min_value=0.0,
-    value=10.0,
-    step=1.0
+    value=0.5,
+    step=0.5
 )
 
 # Model values
@@ -102,8 +102,17 @@ bulk_perc = 1.0
 progressive_perc = error_rate
 
 
-def calculate_strategy(strategy_name, perc, human_work, is_progressive):
+def calculate_strategy(strategy_name, perc, is_progressive):
     processed_rows = dataset_size * perc
+
+    data_based_human_work = (processed_rows / 1000) * human_work_per_1000_rows
+
+    if is_progressive:
+        iteration_overhead = iterations * iteration_human_overhead
+    else:
+        iteration_overhead = 0
+
+    human_work = data_based_human_work + iteration_overhead
 
     if is_progressive:
         number_of_iterations = iterations
@@ -171,14 +180,12 @@ def calculate_strategy(strategy_name, perc, human_work, is_progressive):
 bulk = calculate_strategy(
     strategy_name="Bulk",
     perc=bulk_perc,
-    human_work=bulk_human_work,
     is_progressive=False
 )
 
 progressive = calculate_strategy(
     strategy_name="Progressive",
     perc=progressive_perc,
-    human_work=progressive_human_work,
     is_progressive=True
 )
 
@@ -256,31 +263,126 @@ st.plotly_chart(fig, use_container_width=True)
 
 # Explanation
 with st.expander("Explanation of formulas and assumptions"):
-    st.write("""
-    This dashboard compares two strategies:
+    st.markdown("""
 
-    **Bulk processing** processes the entire dataset.  
-    Therefore, `perc = 1.0`.
+## STRATEGY ASSUMPTIONS
 
-    **Progressive processing** processes only the dirty or relevant part of the dataset first.  
-    Therefore, `perc = error rate`.
+### Bulk processing
+Bulk processing evaluates the entire dataset at once.
 
-    The progressive strategy is divided into multiple iterations. Each iteration processes an increment containing multiple tuples, not just one row at a time.
+- Percentage processed:
 
-    The formulas used are:
+    `perc = 1.0`
 
-    - **Quality improvement** = dataset size × percentage processed × error rate × effectiveness
-    - **Assessment cost** = dataset size × percentage processed × assessment cost per row
-    - **Improvement cost** = dataset size × percentage processed × error rate × improvement cost per row
-    - **DQ waste** = dataset size × percentage processed × error rate × improvement cost per row × (1 - effectiveness)
+- All rows are processed before the first update is shown.
 
-    The same effectiveness value is used for both Bulk and Progressive.
 
-    Latency is calculated as:
+### Progressive processing
+Progressive processing evaluates only the selected/relevant subset of the dataset first.
 
-    - **Bulk latency** = time needed to process all considered rows
-    - **Progressive latency** = time needed to process the first increment
+- Percentage processed:
 
-    The spider diagram is not inverted.  
-    This means that values closer to the center are lower, while values farther from the center are higher.
-    """)
+    `perc = error rate`
+
+- The process is divided into multiple iterations.
+- Each iteration processes an increment containing multiple tuples, not one row at a time.
+- The first update is shown after the first increment has been processed.
+
+---
+
+## CORE FORMULAS
+
+### Quality improvement
+
+`Quality improvement = dataset size × percentage processed × error rate × effectiveness`
+
+Represents the amount of data quality improvement achieved by the strategy.
+
+
+### Assessment cost
+
+`Assessment cost = dataset size × percentage processed × assessment cost per row`
+
+Represents the cost of evaluating or inspecting data.
+
+
+### Improvement cost
+
+`Improvement cost = dataset size × percentage processed × error rate × improvement cost per row`
+
+Represents the cost of correcting or improving low-quality data.
+
+
+### DQ waste
+
+`DQ waste = dataset size × percentage processed × error rate × improvement cost per row × (1 - effectiveness)`
+
+Represents the cost spent on improvements that do not successfully improve data quality.
+
+---
+
+## LATENCY MODEL
+
+### Bulk latency
+
+`Latency = time required to process all considered rows`
+
+The user receives the first update only after the full batch has completed.
+
+
+### Progressive latency
+
+`Latency = time required to process the first increment`
+
+The user receives an early update after the first iteration finishes.
+
+---
+
+## HUMAN WORK MODEL
+
+Human work is calculated dynamically instead of being manually assigned to each strategy.
+
+### Data-based human work
+
+`Human work = processed rows / 1000 × human work per 1000 rows`
+
+Represents manual effort associated with handling larger amounts of data.
+
+
+### Progressive iteration overhead
+
+`Iteration overhead = number of iterations × human work per progressive iteration`
+
+Represents additional monitoring, interaction, or coordination caused by repeated iterations.
+
+
+### Total human work
+
+`Total human work = data-based human work + iteration overhead`
+
+This means:
+
+- Bulk can require more human work when much more data is processed.
+- Progressive can require more human work when many iterations introduce additional monitoring overhead.
+
+---
+
+## SHARED ASSUMPTIONS
+
+- The same effectiveness value is used for both Bulk and Progressive.
+- CO₂ emissions are proportional to processing time.
+- Progressive processing may introduce additional selection overhead due to tuple selection, filtering, scheduling, and iterative coordination.
+- A selection overhead factor greater than `1.0` increases total processing time, latency, and CO₂ emissions.
+
+---
+
+## SPIDER DIAGRAM INTERPRETATION
+
+The spider diagram is **not inverted**.
+
+- Values closer to the center represent lower values.
+- Values farther from the center represent higher values.
+
+The diagram shows relative differences between the strategies after normalization.
+
+""")

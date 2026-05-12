@@ -45,11 +45,20 @@ enrichment_cost_per_record = st.sidebar.number_input(
     format="%.5f"
 )
 
-rows_per_minute = st.sidebar.number_input(
-    "Cleaning speed (records/min)",
-    min_value=100,
-    value=5000,
-    step=100
+effectiveness = st.sidebar.slider(
+    "Method effectiveness (%)",
+    min_value=1,
+    max_value=100,
+    value=90,
+    step=1
+) / 100
+
+unit_time_per_record = st.sidebar.number_input(
+    "Unit time per record (sec)",
+    min_value=0.0001,
+    value=0.012,
+    step=0.001,
+    format="%.4f"
 )
 
 co2_per_minute = st.sidebar.number_input(
@@ -60,78 +69,59 @@ co2_per_minute = st.sidebar.number_input(
     format="%.5f"
 )
 
-full_latency_min = st.sidebar.number_input(
-    "Full cleaning latency before results (min)",
-    min_value=0.0,
-    value=40.0,
-    step=1.0
-)
-
-on_demand_first_result_sec = st.sidebar.number_input(
-    "On-demand time to first result (sec)",
-    min_value=0.0,
-    value=2.0,
-    step=0.5
-)
-
-reuse_factor = st.sidebar.slider(
-    "Reuse potential of cleaned data (%)",
-    min_value=0,
-    max_value=100,
-    value=30,
-    step=10
-)
-
 # Model values
 query_relevant_rate = query_relevant_percent / 100
+
+# Simplifying assumption:
+# The query-relevant fraction is also used as the error rate approximation.
+error_rate = query_relevant_rate
+
 unit_cleaning_cost = matching_cost_per_record + enrichment_cost_per_record
 
-full_records_cleaned = dataset_size
-on_demand_records_cleaned = dataset_size * query_relevant_rate
+full_perc = 1.0
+on_demand_perc = query_relevant_rate
 
 
-def calculate_cleaning_strategy(strategy_name, records_cleaned, latency_to_first_result_sec):
+def calculate_cleaning_strategy(perc):
+    records_cleaned = dataset_size * perc
+
+    # Cleaning cost
     cleaning_cost = records_cleaned * unit_cleaning_cost
-    time_min = records_cleaned / rows_per_minute
+
+    # Latency and processing time
+    latency_sec = records_cleaned * unit_time_per_record
+    time_min = latency_sec / 60
+
+    # CO₂ impact
     co2 = time_min * co2_per_minute
 
-    # Waste here means cleaning cost spent on data not needed for the current query.
-    if strategy_name == "Full Cleaning":
-        wasted_fraction = 1 - query_relevant_rate
-        waste = cleaning_cost * wasted_fraction
-    else:
-        waste = 0
+    # DQ improvement: N × perc × e × p
+    #dq_improvement = dataset_size * perc * error_rate * effectiveness
 
-    # Simple usefulness score:
-    # Full cleaning has more reuse potential, on-demand is optimized for current query.
-    if strategy_name == "Full Cleaning":
-        reuse_score = reuse_factor
-    else:
-        reuse_score = 100 - reuse_factor
+    # DQ waste: N × perc × e × c × (1 - p)
+    # Here, enrichment cost is used as the improvement cost c.
+    dq_waste = (
+        dataset_size
+        * perc
+        * error_rate
+        * enrichment_cost_per_record
+        * (1 - effectiveness)
+    )
 
     return {
         "Records cleaned": records_cleaned,
-        "Percentage cleaned (%)": records_cleaned / dataset_size * 100,
+        "Percentage cleaned (%)": perc * 100,
         "Cleaning cost (€)": cleaning_cost,
-        "Waste (€)": waste,
+        "DQ waste (€)": dq_waste,
         "Time (min)": time_min,
         "CO₂ (kg)": co2,
-        "Latency to first result (sec)": latency_to_first_result_sec,
-        "Reuse / query-fit score": reuse_score,
+        "Latency to result (sec)": latency_sec,
+        "Effectiveness (%)": effectiveness * 100,
     }
 
 
-full_cleaning = calculate_cleaning_strategy(
-    strategy_name="Full Cleaning",
-    records_cleaned=full_records_cleaned,
-    latency_to_first_result_sec=full_latency_min * 60
-)
-
-on_demand_cleaning = calculate_cleaning_strategy(
-    strategy_name="On-Demand Cleaning",
-    records_cleaned=on_demand_records_cleaned,
-    latency_to_first_result_sec=on_demand_first_result_sec
-)
+full_cleaning = calculate_cleaning_strategy(full_perc)
+on_demand_cleaning = calculate_cleaning_strategy(on_demand_perc)
 
 df = pd.DataFrame({
     "Full Cleaning": full_cleaning,
@@ -142,14 +132,14 @@ df = pd.DataFrame({
 st.subheader("Main comparison")
 
 cost_saved = full_cleaning["Cleaning cost (€)"] - on_demand_cleaning["Cleaning cost (€)"]
-waste_avoided = full_cleaning["Waste (€)"] - on_demand_cleaning["Waste (€)"]
+dq_waste_reduced = full_cleaning["DQ waste (€)"] - on_demand_cleaning["DQ waste (€)"]
 time_saved = full_cleaning["Time (min)"] - on_demand_cleaning["Time (min)"]
 records_avoided = full_cleaning["Records cleaned"] - on_demand_cleaning["Records cleaned"]
 
 col1, col2, col3, col4 = st.columns(4)
 
 col1.metric("Cost saved", f"€{cost_saved:,.2f}")
-col2.metric("Waste avoided", f"€{waste_avoided:,.2f}")
+col2.metric("DQ waste reduced", f"€{dq_waste_reduced:,.4f}")
 col3.metric("Time saved", f"{time_saved:.2f} min")
 col4.metric("Records avoided", f"{records_avoided:,.0f}")
 
@@ -158,25 +148,27 @@ st.subheader("Raw values")
 st.dataframe(df.round(4), use_container_width=True)
 
 # Bar chart
-st.subheader("Cost and waste comparison")
+st.subheader("Cost and DQ waste comparison")
 
 bar_fig = go.Figure()
 
 bar_fig.add_trace(go.Bar(
     x=df.index,
     y=df["Cleaning cost (€)"],
-    name="Cleaning cost (€)"
+    name="Cleaning cost (€)",
+    marker_color="#4C78A8"
 ))
 
 bar_fig.add_trace(go.Bar(
     x=df.index,
-    y=df["Waste (€)"],
-    name="Waste (€)"
+    y=df["DQ waste (€)"],
+    name="DQ waste (€)",
+    marker_color="#F58518"
 ))
 
 bar_fig.update_layout(
     barmode="group",
-    title="Cleaning cost and waste",
+    title="Cleaning cost and DQ waste",
     yaxis_title="€",
     height=450
 )
@@ -189,12 +181,11 @@ st.subheader("Spider diagram")
 spider_df = pd.DataFrame(index=df.index)
 
 spider_df["Cleaning cost"] = df["Cleaning cost (€)"]
-spider_df["Waste"] = df["Waste (€)"]
+spider_df["DQ waste"] = df["DQ waste (€)"]
 spider_df["Time"] = df["Time (min)"]
 spider_df["CO₂"] = df["CO₂ (kg)"]
-spider_df["Latency"] = df["Latency to first result (sec)"]
+spider_df["Latency"] = df["Latency to result (sec)"]
 spider_df["Records cleaned"] = df["Records cleaned"]
-spider_df["Reuse / query-fit"] = df["Reuse / query-fit score"]
 
 
 def normalize(value, max_value):
@@ -202,10 +193,12 @@ def normalize(value, max_value):
         return 0
     return value / max_value * 100
 
+
 def normalize_log(value, max_value):
     if max_value == 0:
         return 0
     return np.log1p(value) / np.log1p(max_value) * 100
+
 
 radar_df = pd.DataFrame(index=spider_df.index)
 
@@ -213,18 +206,6 @@ for column in spider_df.columns:
     radar_df[column] = spider_df[column].apply(
         lambda x: normalize(x, spider_df[column].max())
     )
-
-
-
-#for column in spider_df.columns:
-#    if column == "Latency":
-#        radar_df[column] = spider_df[column].apply(
-#            lambda x: normalize_log(x, spider_df[column].max())
-#        )
-#    else:
-#        radar_df[column] = spider_df[column].apply(
-#            lambda x: normalize(x, spider_df[column].max())
-#        )
 
 categories = list(radar_df.columns)
 
@@ -249,27 +230,98 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # Explanation
-with st.expander("Explanation of model and assumptions"):
-    st.write("""
-    This example compares two cleaning strategies:
+with st.expander("Explanation of formulas and assumptions"):
+    st.markdown("""
+## STRATEGY ASSUMPTIONS
 
-    **Full Cleaning (Offline/Batch)** cleans the entire dataset before the data is used.
-    This gives a complete cleaned dataset, but it can be expensive and may clean many records
-    that are not needed for the current query.
+### Full Cleaning
 
-    **On-Demand Cleaning** cleans only the records needed to answer a specific query.
-    This reduces cost, time, CO₂ emissions and waste when the query only needs a subset of the data.
+Full Cleaning processes the entire dataset before the data is used.
 
-    In this visualization:
+- Percentage processed:
 
-    - **Records cleaned** represents how many tuples are actually processed.
-    - **Cleaning cost** is calculated as records cleaned × (matching cost + enrichment cost).
-    - **Waste** is the cost of cleaning records that are not relevant to the current query.
-    - **Latency** represents how long the user waits before seeing the first result.
-    - **Reuse / query-fit score** is a simplified score:
-        - Full cleaning gets higher value when reuse potential is high.
-        - On-demand cleaning gets higher value when the focus is a narrow one-time query.
+    `perc = 1.0`
 
-    The spider diagram is not inverted:
-    values near the center are lower, while values farther out are higher.
-    """)
+- The result is only available after all records have been cleaned.
+
+
+### On-Demand Cleaning
+
+On-Demand Cleaning processes only the records needed for a specific query.
+
+- Percentage processed:
+
+    `perc = query-relevant records`
+
+- The result is available after the query-relevant subset has been cleaned.
+
+---
+
+## CORE FORMULAS
+
+### Records cleaned
+
+`Records cleaned = dataset size × percentage processed`
+                
+This represents the number of records that are cleaned under each strategy.
+
+### Cleaning cost
+
+`Cleaning cost = records cleaned × (matching cost per record + enrichment cost per record)`
+
+This represents the total cost of applying the cleaning operations.
+
+### DQ waste
+
+`DQ waste = dataset size × percentage processed × error rate × improvement cost × (1 - effectiveness)`
+
+In this example, enrichment cost is used as the improvement cost.
+
+---
+
+## LATENCY MODEL
+
+Latency is calculated by formula instead of being manually assigned.
+
+### Full Cleaning latency
+
+`Latency = unit time per record × dataset size`
+
+Full Cleaning must process the whole dataset before producing the result.
+
+### On-Demand Cleaning latency
+
+`Latency = unit time per record × (dataset size × query-relevant records)`
+
+On-Demand Cleaning only processes the subset needed for the query.
+
+---
+
+## CO₂ MODEL
+
+`CO₂ = processing time × CO₂ per compute minute`
+
+CO₂ emissions are assumed to be proportional to processing time.
+
+---
+
+## SHARED ASSUMPTIONS
+
+- The same effectiveness value is used for both Full Cleaning and On-Demand Cleaning.
+- The same matching and enrichment costs are used for both strategies.
+- The same unit time per record is used for both strategies.
+- Query-relevant records determine the percentage of data processed by On-Demand Cleaning.
+- The query-relevant fraction is also used as a simplified approximation of the error rate.
+- Reuse potential is not included in this version, since it was not part of the core comparison.
+- DQ waste is included as a common metric, using the same structure as in the other examples.
+
+---
+
+## SPIDER DIAGRAM INTERPRETATION
+
+The spider diagram is **not inverted**.
+
+- Values closer to the center represent lower values.
+- Values farther from the center represent higher values.
+
+""")

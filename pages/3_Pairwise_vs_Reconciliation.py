@@ -241,28 +241,43 @@ bar_fig = go.Figure()
 
 bar_fig.add_trace(go.Bar(
     x=df.index,
-    y=df["Assessment cost (€)"],
-    name="Assessment cost (€)",
-    marker_color="#4C78A8"
+    y=df["Improvement cost (€)"],
+    name="Improvement cost (€)",
+    text=df["Improvement cost (€)"].round(2),
+    textposition="outside",
+    marker_color="#F58518"
 ))
+
+# bar_fig.add_trace(go.Bar(
+#     x=df.index,
+#     y=df["Total cost (€)"],
+#     name="Total cost (€)",
+#     text=df["Total cost (€)"].round(2),
+#     textposition="outside",
+#     marker_color="#E45756"
+# ))
 
 bar_fig.add_trace(go.Bar(
     x=df.index,
-    y=df["Improvement cost (€)"],
-    name="Improvement cost (€)",
-    marker_color="#F58518"
+    y=df["DQ improvement"],
+    name="DQ improvement",
+    text=df["DQ improvement"].round(2),
+    textposition="outside",
+    marker_color="#4C78A8"
 ))
 
 bar_fig.add_trace(go.Bar(
     x=df.index,
     y=df["DQ waste (€)"],
     name="DQ waste (€)",
+    text=df["DQ waste (€)"].round(2),
+    textposition="outside",
     marker_color="#54A24B"
 ))
 
 bar_fig.update_layout(
     barmode="group",
-    title="Assessment cost, improvement cost and DQ waste",
+    title="Improvement cost, DQ improvement and DQ waste",
     yaxis_title="€",
     height=450
 )
@@ -270,59 +285,65 @@ bar_fig.update_layout(
 st.plotly_chart(bar_fig, use_container_width=True)
 
 # ------------------------------------------------------------
-# Operations chart
+# Spider chart / Trade-off radar chart
 # ------------------------------------------------------------
 
-st.subheader("Operations comparison")
-
-operations_fig = go.Figure()
-
-operations_fig.add_trace(go.Bar(
-    x=df.index,
-    y=df["Operations"],
-    name="Operations",
-    marker_color="#B279A2"
-))
-
-operations_fig.update_layout(
-    title="Number of operations required",
-    yaxis_title="Operations",
-    height=400
-)
-
-st.plotly_chart(operations_fig, use_container_width=True)
-
 # ------------------------------------------------------------
-# Spider chart
+# Trade-off spider chart
 # ------------------------------------------------------------
 
-st.subheader("Spider diagram")
+st.subheader("Trade-off spider diagram")
 
-spider_df = pd.DataFrame(index=df.index)
+tradeoff_df = pd.DataFrame(index=df.index)
 
-spider_df["Total cost"] = df["Total cost (€)"]
-spider_df["Improvement cost"] = df["Improvement cost (€)"]
-spider_df["DQ waste"] = df["DQ waste (€)"]
-spider_df["Time"] = df["Time (min)"]
-spider_df["CO₂"] = df["CO₂ (kg)"]
-spider_df["Latency"] = df["Latency to result (sec)"]
-spider_df["Human work"] = df["Human work (min)"]
-spider_df["Operations"] = df["Operations"]
-spider_df["DQ improvement"] = df["DQ improvement"]
+# Raw values used for the trade-off dimensions
+tradeoff_df["Quality score"] = df["DQ improvement"]
+tradeoff_df["Cost efficiency"] = df["Improvement cost (€)"]
+tradeoff_df["Waste efficiency"] = df["DQ waste (€)"]
+tradeoff_df["Time efficiency"] = df["Time (min)"]
+tradeoff_df["CO₂ efficiency"] = df["CO₂ (kg)"]
+tradeoff_df["Low human work"] = df["Human work (min)"]
 
 
-def normalize(value, max_value):
+def normalize_higher_is_better(value, max_value):
     if max_value == 0:
         return 0
     return value / max_value * 100
 
 
-radar_df = pd.DataFrame(index=spider_df.index)
+def normalize_lower_is_better(value, max_value):
+    if max_value == 0:
+        return 100
+    return (1 - value / max_value) * 100
 
-for column in spider_df.columns:
-    radar_df[column] = spider_df[column].apply(
-        lambda x: normalize(x, spider_df[column].max())
-    )
+
+radar_df = pd.DataFrame(index=tradeoff_df.index)
+
+# Higher is better
+radar_df["Quality score"] = tradeoff_df["Quality score"].apply(
+    lambda x: normalize_higher_is_better(x, tradeoff_df["Quality score"].max())
+)
+
+# Lower is better, therefore inverted
+radar_df["Cost efficiency"] = tradeoff_df["Cost efficiency"].apply(
+    lambda x: normalize_lower_is_better(x, tradeoff_df["Cost efficiency"].max())
+)
+
+radar_df["Waste efficiency"] = tradeoff_df["Waste efficiency"].apply(
+    lambda x: normalize_lower_is_better(x, tradeoff_df["Waste efficiency"].max())
+)
+
+radar_df["Time efficiency"] = tradeoff_df["Time efficiency"].apply(
+    lambda x: normalize_lower_is_better(x, tradeoff_df["Time efficiency"].max())
+)
+
+radar_df["CO₂ efficiency"] = tradeoff_df["CO₂ efficiency"].apply(
+    lambda x: normalize_lower_is_better(x, tradeoff_df["CO₂ efficiency"].max())
+)
+
+radar_df["Low human work"] = tradeoff_df["Low human work"].apply(
+    lambda x: normalize_lower_is_better(x, tradeoff_df["Low human work"].max())
+)
 
 categories = list(radar_df.columns)
 
@@ -330,6 +351,7 @@ fig = go.Figure()
 
 for strategy in radar_df.index:
     values = radar_df.loc[strategy].tolist()
+
     fig.add_trace(go.Scatterpolar(
         r=values + [values[0]],
         theta=categories + [categories[0]],
@@ -338,9 +360,14 @@ for strategy in radar_df.index:
     ))
 
 fig.update_layout(
-    polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+    polar=dict(
+        radialaxis=dict(
+            visible=True,
+            range=[0, 100]
+        )
+    ),
     showlegend=True,
-    title="Normalized comparison: higher values are farther from the center",
+    title="Normalized trade-off comparison: higher values are better",
     height=550
 )
 
@@ -354,9 +381,7 @@ with st.expander("Explanation of formulas and assumptions"):
     st.markdown("""
 ## STRATEGY ASSUMPTIONS
 
-This example compares two approaches for linking city names to coordinates.
-
-The task is:
+This dashboard compares two approaches for enriching city values with coordinates:
 
 `city name → coordinates`
 
@@ -364,19 +389,18 @@ For example:
 
 `Milano → latitude and longitude`
 
-The dashboard is inspired by Table 3 in the paper and can be used to compare pairwise-based and reconciliation-based enrichment methods.
+Both strategies enrich the same number of city values. The difference is how the enrichment is performed.
 
 ---
 
-## Pairwise-based
+## Pairwise-based approach
 
 Pairwise-based enrichment follows a traditional data integration pipeline.
 
 The user first has to:
 
-- search for external city-coordinate data online
-- understand the data structure
-- download or prepare the external dataset
+- search for external city-coordinate data
+- understand and prepare the external dataset
 - compare each city with several candidate matches
 
 In this model, each city is compared with the top-k most similar candidates.
@@ -389,43 +413,41 @@ Therefore:
 
 `Operations = number of cities × top-k candidates`
 
+With the default values:
+
+`Operations = 6,419 × 50 = 320,950`
+
 This means pairwise matching performs many comparisons.
 
 ---
 
-## Reconciliation-based
+## Reconciliation-based approach
 
 Reconciliation-based enrichment uses a reconciliation service or API.
 
-Instead of comparing each city with many candidates manually, the method sends the city name to a service or reconciler.
+Instead of manually comparing each city with many candidates, the method sends the city value to a service or reconciler.
 
 For example:
 
 `city, state → reconciler/API → coordinates`
 
+Conceptually, reconciliation performs one lookup per city.
+
 Therefore:
 
 `Operations = number of cities`
 
-This means reconciliation performs one lookup per city.
+With the default values:
 
-However, in order to reproduce the cost values from Table 3, the dashboard uses the same cost basis as the paper when calculating improvement cost.
+`Operations = 6,419`
 
-This means that:
+This is much fewer than pairwise matching.
 
-`Operations` shows the logical number of lookups performed by the reconciliation method.
-
-`Cost basis` is used to reproduce the cost calculation from Table 3.
-
-For reconciliation:
-
-`Operations = number of cities`
-
-but the improvement cost is calculated using:
+However, to stay aligned with the paper's cost values, reconciliation improvement cost is calculated using the same top-k cost basis:
 
 `Improvement cost = number of cities × top-k candidates × cost per lookup`
 
-This is why the reconciliation method can show fewer operations, while still matching the improvement cost values reported in the paper.
+This means that reconciliation has fewer logical operations, but its cost calculation can still reproduce the values reported in the paper.
 
 ---
 
@@ -441,52 +463,22 @@ In this example:
 
 because all city values must be enriched with coordinates.
 
-With the paper's values:
-
-`Records enriched = 6,419`
-
----
-
-### Pairwise operations
-
-`Operations = number of cities × top-k candidates`
-
 With the default values:
 
-`Operations = 6,419 × 50 = 320,950`
-
-This gives many comparisons.
-
----
-
-### Reconciliation operations
-
-`Operations = number of cities`
-
-With the default values:
-
-`Operations = 6,419`
-
-This is much fewer than pairwise matching.
+`Records enriched = 6,419 × 1 = 6,419`
 
 ---
 
 ### Effectiveness
 
-Effectiveness represents the quality of the selected method.
+Effectiveness represents how well the method links city values to the correct coordinates.
 
-In the paper, the effectiveness values are measured differently:
+In the paper, the quality measures are different:
 
 - Pairwise-based methods use **F1-score**
 - Reconciliation-based methods use **Accuracy**
 
-In the dashboard, these values are represented as effectiveness percentages.
-
-For example:
-
-`p = 0.8774` is shown approximately as `87.74%`
-
-If the slider only allows whole percentages, small differences in DQ waste may occur because of rounding.
+In this dashboard, both are represented as effectiveness percentages to make the comparison easier.
 
 ---
 
@@ -496,25 +488,39 @@ If the slider only allows whole percentages, small differences in DQ waste may o
 
 This represents how many city values are successfully enriched.
 
-For example, if there are 6,419 cities and the method has 90% effectiveness:
+Example:
 
-`DQ improvement = 6,419 × 0.90`
+`DQ improvement = 6,419 × 0.90 = 5,777.1`
+
+So, with 90% effectiveness, approximately 5,777 city values are successfully linked to coordinates.
+
+Higher DQ improvement is better.
 
 ---
 
 ### Processing cost
 
-Processing cost represents the cost per comparison or lookup.
+Processing cost represents the cost of one comparison or lookup.
 
-To make the value easier to read, the dashboard displays it as:
+For Pairwise-based methods:
+
+`processing cost = cost per comparison`
+
+For Reconciliation-based methods:
+
+`processing cost = cost per lookup`
+
+To make the value easier to read, the dashboard displays processing cost as:
 
 `Processing cost ×1000`
 
-This follows the same idea as Table 3, where the cost column is shown as:
+This follows the same idea as the paper's table, where the cost is shown as:
 
 `c_j,k × 1000`
 
-For example, if the actual cost per operation is:
+Example:
+
+If the actual cost per operation is:
 
 `0.000300`
 
@@ -530,7 +536,7 @@ Important:
 
 The `×1000` value is only for display.
 
-The actual improvement cost is still calculated using the unscaled cost.
+The actual improvement cost is still calculated using the unscaled processing cost.
 
 ---
 
@@ -540,11 +546,11 @@ For pairwise matching:
 
 `Improvement cost = number of cities × top-k candidates × cost per comparison`
 
-With the default structure:
+Example:
 
-`Improvement cost = 6,419 × 50 × cost per comparison`
+`Improvement cost = 6,419 × 50 × 0.012125 = 3,891.52`
 
-Pairwise matching is more expensive because each city is compared with many candidates.
+Pairwise can become expensive because each city is compared with many candidates.
 
 ---
 
@@ -554,44 +560,43 @@ Conceptually, reconciliation performs one lookup per city:
 
 `Operations = number of cities`
 
-However, to reproduce the improvement cost values from Table 3, the dashboard calculates reconciliation improvement cost using the same cost basis as the table:
+However, to reproduce the paper's reported improvement cost values, the dashboard calculates reconciliation improvement cost using:
 
 `Improvement cost = number of cities × top-k candidates × cost per lookup`
 
-For example, for HERE:
+Example for a HERE-like method:
 
-`6,419 × 50 × 0.000300 = 96.285`
+`Improvement cost = 6,419 × 50 × 0.000300 = 96.285`
 
-This matches the improvement cost of approximately `96` shown in Table 3.
+This explains why reconciliation can have:
 
-This is a modelling choice made to stay aligned with the paper's reported values.
+`Operations = 6,419`
+
+but still have an improvement cost close to:
+
+`96`
 
 ---
 
 ### Assessment cost
 
-For pairwise matching, the user must search for and assess external data first.
+Assessment cost represents manual work before enrichment can happen.
 
-This includes manual work such as:
-
-- searching for city-coordinate data
-- selecting relevant sources
-- customizing queries
-- assessing whether the data is suitable for matching
+For Pairwise-based methods, this includes searching for, preparing, and assessing external data.
 
 The dashboard calculates assessment cost as:
 
 `Assessment cost = number of countries × manual minutes per country / 60 × labour cost per hour`
 
-To reproduce Table 3, the default values can be set to:
+Example:
 
-`3 countries × 60 minutes / 60 × €40 = €120`
+`Assessment cost = 3 × 40 / 60 × €60 = €120`
 
-For reconciliation-based methods:
+For Reconciliation-based methods:
 
 `Assessment cost = 0`
 
-because the enrichment is mediated by the reconciler or API.
+because the enrichment is handled by a reconciler or API.
 
 ---
 
@@ -599,9 +604,9 @@ because the enrichment is mediated by the reconciler or API.
 
 `Total cost = improvement cost + assessment cost`
 
-Pairwise methods usually have both improvement cost and assessment cost.
+Pairwise methods can have both improvement cost and assessment cost.
 
-Reconciliation-based methods usually have improvement cost, but no assessment cost.
+Reconciliation-based methods usually have no assessment cost.
 
 ---
 
@@ -609,105 +614,131 @@ Reconciliation-based methods usually have improvement cost, but no assessment co
 
 `DQ waste = improvement cost × (1 - effectiveness)`
 
-This represents money spent on enrichment attempts that do not successfully improve the data.
+DQ waste represents money spent on enrichment attempts that do not successfully improve the data.
 
-A lower effectiveness gives higher waste.
+Example:
 
-A higher improvement cost also increases waste.
+If:
 
----
+`Improvement cost = €3,891.52`
 
-### Time
+and:
 
-For pairwise matching:
+`Effectiveness = 87.74% = 0.8774`
 
-`Time = operations × time per comparison`
+then:
 
-For reconciliation:
+`DQ waste = 3,891.52 × (1 - 0.8774)`
 
-`Time = operations × time per lookup`
+`DQ waste ≈ €477`
 
-The result is converted from seconds to minutes.
-
-In this dashboard, time is based on logical operations, not the Table 3 cost basis.
-
-This means reconciliation may have fewer operations and lower latency, even when its improvement cost is calculated using the paper's cost basis.
+Lower DQ waste is better.
 
 ---
 
-### CO₂
+### Time and latency
+
+For Pairwise-based methods:
+
+`Latency = operations × time per comparison`
+
+For Reconciliation-based methods:
+
+`Latency = operations × time per lookup`
+
+The result is converted from seconds to minutes:
+
+`Time in minutes = latency in seconds / 60`
+
+Time and latency are based on logical operations.
+
+---
+
+### CO₂ impact
 
 `CO₂ = processing time × CO₂ per compute minute`
 
-CO₂ emissions are assumed to be proportional to processing time.
+The dashboard assumes that CO₂ emissions are proportional to processing time.
+
+Lower CO₂ is better.
 
 ---
 
-## USER AND SYSTEM TRADE-OFFS
+### Human work
 
-### Pairwise-based
+For Pairwise-based methods:
 
-Advantages:
+`Human work = number of countries × manual minutes per country`
 
-- flexible
-- gives the user more control
-- can be used when no reconciliation API exists
+For Reconciliation-based methods:
 
-Disadvantages:
+`Human work = 0`
 
-- many comparisons
-- higher processing cost
-- more manual assessment work
-- higher latency
-- more CO₂ from compute time
+This reflects that pairwise methods require manual data exploration and preparation, while reconciliation-based methods rely on a service or API.
 
 ---
 
-### Reconciliation-based
+## COST COMPARISON CHART
 
-Advantages:
+The cost comparison chart shows:
 
-- simpler for the user
-- fewer logical operations
-- lower latency
-- less manual work
-- can be cheaper when a good API or reconciler is available
+- improvement cost
+- DQ improvement
+- DQ waste
 
-Disadvantages:
+These metrics show how much the method costs, how much quality improvement it gives, and how much cost is wasted due to imperfect effectiveness.
 
-- depends on an external API or reconciler
-- may not exist for every enrichment task
-- can give less control over the matching process
+Assessment cost and total cost are kept in the raw values table for exact comparison.
 
 ---
 
-## MODEL SIMPLIFICATIONS
+## TRADE-OFF SPIDER DIAGRAM
 
-The dashboard is a simplified reproduction of the paper's comparison.
+The spider diagram summarizes the comparison across several dimensions:
+
+- Quality score
+- Cost efficiency
+- Waste efficiency
+- Time efficiency
+- CO₂ efficiency
+- Low human work
+
+All dimensions are normalized so that:
+
+`Higher values are better`
+
+For metrics where lower is better, the values are inverted.
+
+For example:
+
+`Cost efficiency = 1 - improvement cost / maximum improvement cost`
+
+This means that values farther from the center represent a better outcome.
+
+---
+
+## IMPORTANT MODEL SIMPLIFICATIONS
+
+This dashboard is a simplified model.
 
 The most important simplifications are:
 
-- Effectiveness is shown as a percentage, while the paper uses F1-score for pairwise methods and Accuracy for reconciliation methods.
-- Processing cost is displayed as `×1000`, but calculations use the actual unscaled cost.
-- Reconciliation has fewer logical operations, but its improvement cost is calculated with the Table 3 cost basis in order to reproduce the reported paper values.
-- Time, latency, CO₂, and human work are simplified estimates and are not directly reported in Table 3.
+- Pairwise effectiveness and reconciliation effectiveness are shown as percentages, even though the paper uses F1-score for pairwise methods and Accuracy for reconciliation methods.
+- Processing cost is displayed as `×1000`, while calculations use the actual unscaled cost.
+- Reconciliation has fewer logical operations, but its improvement cost is calculated using the top-k cost basis to match the paper's reported values.
+- Time, latency, CO₂, and human work are simplified estimates.
 
 ---
 
-## SPIDER DIAGRAM INTERPRETATION
+## INTERPRETATION
 
-The spider diagram is not inverted.
+Pairwise-based methods can be useful when no suitable reconciliation API exists, and they can give the user more control.
 
-Values farther from the center are higher.
+However, they often require more comparisons, more manual work, higher assessment cost, and higher latency.
 
-This means:
+Reconciliation-based methods are often more efficient because they use a service or API to resolve entities directly.
 
-- higher DQ improvement is good
-- higher cost is bad
-- higher CO₂ is bad
-- higher latency is bad
-- higher human work is bad
-- higher operations is bad
+They usually require fewer logical operations, less manual work, and no assessment cost.
 
-Therefore, the diagram shows relative differences, not a direct "better or worse" score.
+The best method depends on the balance between quality, cost, waste, time, CO₂, and human involvement.
 """)

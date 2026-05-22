@@ -5,7 +5,7 @@ import numpy as np
 
 st.set_page_config(page_title="Cleaning on Demand", layout="wide")
 
-st.title("Example 2: Cleaning on Demand")
+st.title("Example 3: Cleaning on Demand")
 st.caption(
     "Comparison between full offline cleaning and on-demand cleaning based on the paper."
 )

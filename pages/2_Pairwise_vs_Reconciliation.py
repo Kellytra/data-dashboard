@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 
 st.set_page_config(page_title="Pairwise vs Reconciliation", layout="wide")
 
-st.title("Example 3: Pairwise-based vs Reconciliation-based")
+st.title("Example 2: Pairwise-based vs Reconciliation-based")
 st.caption(
     "A dashboard comparing pairwise-based and reconciliation-based enrichment for linking city names to coordinates."
 )

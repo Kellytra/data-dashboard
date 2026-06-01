@@ -156,14 +156,14 @@ bar_fig.add_trace(go.Bar(
     x=df.index,
     y=df["Cleaning cost (€)"],
     name="Cleaning cost (€)",
-    marker_color="#4C78A8"
+    marker_color="#2E8B57" 
 ))
 
 bar_fig.add_trace(go.Bar(
     x=df.index,
     y=df["DQ waste (€)"],
     name="DQ waste (€)",
-    marker_color="#F58518"
+    marker_color="#CD5C5C" 
 ))
 
 bar_fig.update_layout(

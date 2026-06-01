@@ -11,7 +11,6 @@ st.caption(
 
 st.sidebar.header("Agentic RAG Parameters")
 
-# Input parameters
 candidate_tables = st.sidebar.slider(
     "Number of candidate tables",
     min_value=50,
@@ -60,6 +59,14 @@ imputation_cost = st.sidebar.number_input(
     format="%.5f"
 )
 
+cleaning_effectiveness = st.sidebar.slider(
+    "Cleaning effectiveness (%)",
+    min_value=0,
+    max_value=100,
+    value=90,
+    step=5
+) / 100
+
 unit_time_per_row = st.sidebar.number_input(
     "Unit time per row (sec)",
     min_value=0.0001,
@@ -84,14 +91,6 @@ progressive_passes = st.sidebar.slider(
     step=1
 )
 
-first_result_latency_sec = st.sidebar.number_input(
-    "Initial partial result latency (sec)",
-    min_value=0.1,
-    value=1.5,
-    step=0.5,
-    format="%.1f"
-)
-
 # Model values
 relevant_rate = relevant_tables_percent / 100
 cost_per_row = entity_resolution_cost + api_enrichment_cost + imputation_cost
@@ -103,29 +102,40 @@ static_rows_processed = static_tables_cleaned * rows_per_table
 progressive_rows_processed = progressive_tables_cleaned * rows_per_table
 
 
-def calculate_strategy(strategy_name, tables_cleaned, rows_processed):
+def calculate_strategy(strategy_name, tables_cleaned, rows_processed, is_progressive):
     cleaning_cost = rows_processed * cost_per_row
+
+    # DQ waste: same logic as Example 1
+    # Represents cost spent on cleaning/enrichment that does not successfully improve data quality
+    dq_waste = cleaning_cost * (1 - cleaning_effectiveness)
+
     processing_time_sec = rows_processed * unit_time_per_row
     processing_time_min = processing_time_sec / 60
     co2 = processing_time_min * co2_per_compute_minute
 
-    if strategy_name == "Static Retrieval":
-        dq_waste = cleaning_cost * (1 - relevant_rate)
-        latency_sec = processing_time_sec
-        passes = 1
-    else:
-        dq_waste = 0
-        latency_sec = first_result_latency_sec
+    if is_progressive:
         passes = progressive_passes
+        rows_per_pass = rows_processed / progressive_passes
+
+        # Latency: time until first progressive pass is completed
+        latency_sec = rows_per_pass * unit_time_per_row
+    else:
+        passes = 1
+        rows_per_pass = rows_processed
+
+        # Static latency: all rows must be processed before first result
+        latency_sec = processing_time_sec
 
     return {
         "Tables cleaned": tables_cleaned,
         "Rows processed": rows_processed,
+        "Rows per pass": rows_per_pass,
         "Cleaning cost (€)": cleaning_cost,
         "DQ waste (€)": dq_waste,
         "Processing time (min)": processing_time_min,
         "Latency to first result (sec)": latency_sec,
         "CO₂ (kg)": co2,
+        "Cleaning effectiveness (%)": cleaning_effectiveness * 100,
         "Progressive passes": passes,
     }
 
@@ -133,13 +143,15 @@ def calculate_strategy(strategy_name, tables_cleaned, rows_processed):
 static = calculate_strategy(
     "Static Retrieval",
     static_tables_cleaned,
-    static_rows_processed
+    static_rows_processed,
+    is_progressive=False
 )
 
 progressive = calculate_strategy(
     "Progressive Retrieval",
     progressive_tables_cleaned,
-    progressive_rows_processed
+    progressive_rows_processed,
+    is_progressive=True
 )
 
 df = pd.DataFrame({
@@ -154,13 +166,15 @@ cost_saved = static["Cleaning cost (€)"] - progressive["Cleaning cost (€)"]
 waste_reduced = static["DQ waste (€)"] - progressive["DQ waste (€)"]
 rows_avoided = static["Rows processed"] - progressive["Rows processed"]
 co2_saved = static["CO₂ (kg)"] - progressive["CO₂ (kg)"]
+time_saved = static["Processing time (min)"] - progressive["Processing time (min)"]
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 
 col1.metric("Cost saved", f"€{cost_saved:,.2f}")
 col2.metric("DQ waste reduced", f"€{waste_reduced:,.2f}")
 col3.metric("Rows avoided", f"{rows_avoided:,.0f}")
 col4.metric("CO₂ saved", f"{co2_saved:.5f} kg")
+col5.metric("Time saved", f"{time_saved:.2f} min")
 
 # Raw values
 st.subheader("Raw values")
@@ -174,15 +188,15 @@ bar_fig = go.Figure()
 bar_fig.add_trace(go.Bar(
     x=df.index,
     y=df["Cleaning cost (€)"],
-    name="Cleaning cost (€)",
-    marker_color="#4C78A8"
+    name="Cleaning cost (€)", 
+    marker_color="#2E8B57"
 ))
 
 bar_fig.add_trace(go.Bar(
     x=df.index,
     y=df["DQ waste (€)"],
     name="DQ waste (€)",
-    marker_color="#F58518"
+    marker_color="#CD5C5C" 
 ))
 
 bar_fig.update_layout(
@@ -193,7 +207,6 @@ bar_fig.update_layout(
 )
 
 st.plotly_chart(bar_fig, use_container_width=True)
-
 
 # Spider chart
 st.subheader("Spider diagram")
@@ -256,7 +269,6 @@ Static retrieval pre-cleans and standardizes all candidate tables before indexin
 - The cleaned tables are then available for retrieval.
 - This gives consistent quality, but may clean many tables that are not needed for a specific query.
 
-
 ### Progressive Retrieval with On-demand Cleaning
 
 Progressive retrieval retrieves and cleans only the tables needed for the current query.
@@ -273,27 +285,19 @@ Progressive retrieval retrieves and cleans only the tables needed for the curren
 
 `Rows processed = tables cleaned × rows per table`
 
-
 ### Cleaning cost
 
 `Cleaning cost = rows processed × (entity resolution cost + API enrichment cost + imputation cost)`
 
-This corresponds to the cost of applying the preparation operations.
-
+This corresponds to the cost of applying cleaning and enrichment operations.
 
 ### DQ waste
 
-For the static approach:
+`DQ waste = cleaning cost × (1 - cleaning effectiveness)`
 
-`DQ waste = cleaning cost × (1 - relevant tables per query)`
+DQ waste represents the cost spent on cleaning or enrichment operations that do not successfully improve data quality.
 
-This represents the cost of cleaning tables that are not used for the final query result.
-
-For the progressive approach:
-
-`DQ waste = 0`
-
-This is a simplifying assumption: the agent retrieves and cleans only tables that are relevant to the query.
+This is consistent with Example 1, where DQ waste is based on the part of the improvement effort that is not effective.
 
 ---
 
@@ -305,12 +309,15 @@ This is a simplifying assumption: the agent retrieves and cleans only tables tha
 
 The static strategy must clean all candidate tables before results are available.
 
-
 ### Progressive latency
 
-`Latency = initial partial result latency`
+`Rows per pass = rows processed / progressive passes`
 
-The progressive strategy can return an early partial result before all passes have completed.
+`Latency = rows per pass × unit time per row`
+
+The progressive strategy can return its first result after the first cleaning pass has completed.
+
+This follows the same logic as Example 1, where latency is computed as the time required to process the first progressive iteration.
 
 ---
 
@@ -326,9 +333,10 @@ CO₂ emissions are assumed to be proportional to processing time.
 
 - The same cleaning costs are used for both strategies.
 - The same unit time per row is used for both strategies.
+- The same cleaning effectiveness is used for both strategies.
 - Only a percentage of candidate tables is relevant for each query.
 - Progressive retrieval is modeled as multiple cleaning passes.
-- The progressive strategy is assumed to minimize DQ waste by cleaning only what is needed.
+- Progressive retrieval reduces cost, waste, time, and CO₂ by cleaning fewer rows.
 
 ---
 
@@ -339,5 +347,3 @@ The spider diagram is **not inverted**.
 - Values closer to the center represent lower values.
 - Values farther from the center represent higher values.
 """)
-
-

@@ -81,19 +81,7 @@ selection_overhead_factor = st.sidebar.slider(
     step=0.05
 )
 
-human_work_per_1000_rows = st.sidebar.number_input(
-    "Human work per 1000 rows (min)",
-    min_value=0.0,
-    value=1.0,
-    step=0.5
-)
 
-iteration_human_overhead = st.sidebar.number_input(
-    "Human work per progressive iteration (min)",
-    min_value=0.0,
-    value=0.5,
-    step=0.5
-)
 
 # Model values
 error_rate = dirty_data_percent / 100
@@ -104,15 +92,6 @@ progressive_perc = error_rate
 
 def calculate_strategy(strategy_name, perc, is_progressive):
     processed_rows = dataset_size * perc
-
-    data_based_human_work = (processed_rows / 1000) * human_work_per_1000_rows
-
-    if is_progressive:
-        iteration_overhead = iterations * iteration_human_overhead
-    else:
-        iteration_overhead = 0
-
-    human_work = data_based_human_work + iteration_overhead
 
     if is_progressive:
         number_of_iterations = iterations
@@ -171,7 +150,6 @@ def calculate_strategy(strategy_name, perc, is_progressive):
         "CO₂ (kg)": co2,
         "Time (min)": time_minutes,
         "Latency to first update (sec)": latency_seconds,
-        "Human work (min)": human_work,
         "Effectiveness (%)": effectiveness * 100,
         "Selection overhead factor": selection_overhead,
     }
@@ -223,7 +201,6 @@ spider_df["Total cost"] = df["Total cost (€)"]
 spider_df["CO₂"] = df["CO₂ (kg)"]
 spider_df["Time"] = df["Time (min)"]
 spider_df["Latency"] = df["Latency to first update (sec)"]
-spider_df["Human work"] = df["Human work (min)"]
 spider_df["DQ waste"] = df["DQ waste (€)"]
 spider_df["Quality improvement"] = df["Quality improvement"]
 
@@ -335,35 +312,6 @@ The user receives the first update only after the full batch has completed.
 `Latency = time required to process the first increment`
 
 The user receives an early update after the first iteration finishes.
-
----
-
-## HUMAN WORK MODEL
-
-Human work is calculated dynamically instead of being manually assigned to each strategy.
-
-### Data-based human work
-
-`Human work = processed rows / 1000 × human work per 1000 rows`
-
-Represents manual effort associated with handling larger amounts of data.
-
-
-### Progressive iteration overhead
-
-`Iteration overhead = number of iterations × human work per progressive iteration`
-
-Represents additional monitoring, interaction, or coordination caused by repeated iterations.
-
-
-### Total human work
-
-`Total human work = data-based human work + iteration overhead`
-
-This means:
-
-- Bulk can require more human work when much more data is processed.
-- Progressive can require more human work when many iterations introduce additional monitoring overhead.
 
 ---
 

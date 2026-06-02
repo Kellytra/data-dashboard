@@ -168,13 +168,12 @@ rows_avoided = static["Rows processed"] - progressive["Rows processed"]
 co2_saved = static["CO₂ (kg)"] - progressive["CO₂ (kg)"]
 time_saved = static["Processing time (min)"] - progressive["Processing time (min)"]
 
-col1, col2, col3, col4, col5 = st.columns(5)
+col1, col2, col3, col4 = st.columns(4)
 
 col1.metric("Cost saved", f"€{cost_saved:,.2f}")
-col2.metric("DQ waste reduced", f"€{waste_reduced:,.2f}")
-col3.metric("Rows avoided", f"{rows_avoided:,.0f}")
-col4.metric("CO₂ saved", f"{co2_saved:.5f} kg")
-col5.metric("Time saved", f"{time_saved:.2f} min")
+col2.metric("CO₂ saved", f"{co2_saved:.5f} kg")
+col3.metric("Time saved", f"{time_saved:.2f} min")
+col4.metric("Rows avoided", f"{rows_avoided:,.0f}")
 
 # Raw values
 st.subheader("Raw values")

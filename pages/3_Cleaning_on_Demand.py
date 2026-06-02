@@ -133,13 +133,14 @@ st.subheader("Main comparison")
 
 cost_saved = full_cleaning["Cleaning cost (€)"] - on_demand_cleaning["Cleaning cost (€)"]
 dq_waste_reduced = full_cleaning["DQ waste (€)"] - on_demand_cleaning["DQ waste (€)"]
+co2_saved = full_cleaning["CO₂ (kg)"] - on_demand_cleaning["CO₂ (kg)"]
 time_saved = full_cleaning["Time (min)"] - on_demand_cleaning["Time (min)"]
 records_avoided = full_cleaning["Records cleaned"] - on_demand_cleaning["Records cleaned"]
 
 col1, col2, col3, col4 = st.columns(4)
 
 col1.metric("Cost saved", f"€{cost_saved:,.2f}")
-col2.metric("DQ waste reduced", f"€{dq_waste_reduced:,.4f}")
+col2.metric("CO₂ saved", f"{co2_saved:.5f} kg")
 col3.metric("Time saved", f"{time_saved:.2f} min")
 col4.metric("Records avoided", f"{records_avoided:,.0f}")
 

@@ -153,38 +153,12 @@ time_saved = complete["Processing time (min)"] - partial["Processing time (min)"
 co2_saved = complete["CO₂ (kg)"] - partial["CO₂ (kg)"]
 processed_amount_reduced = complete["Processed amount"] - partial["Processed amount"]
 
-if complete["DQ improvement cost (€)"] > 0:
-    cost_saved_percent = cost_saved / complete["DQ improvement cost (€)"] * 100
-else:
-    cost_saved_percent = 0
+col1, col2, col3, col4 = st.columns(4)
 
-col1, col2, col3, col4, col5 = st.columns(5)
-
-col1.metric(
-    "Cost saved",
-    f"€{cost_saved:,.2f}",
-    f"{cost_saved_percent:.1f}%"
-)
-
-col2.metric(
-    "DQ waste reduced",
-    f"€{waste_reduced:,.2f}"
-)
-
-col3.metric(
-    "Processed amount reduced",
-    f"{processed_amount_reduced:,.0f}"
-)
-
-col4.metric(
-    "CO₂ saved",
-    f"{co2_saved:.5f} kg"
-)
-
-col5.metric(
-    "Time saved",
-    f"{time_saved:.2f} min"
-)
+col1.metric("Cost saved", f"€{cost_saved:,.2f}")
+col2.metric("CO₂ saved", f"{co2_saved:.5f} kg")
+col3.metric("Time saved", f"{time_saved:.2f} min")
+col4.metric("Processed amount reduced", f"{processed_amount_reduced:,.0f}")
 
 # Raw values
 

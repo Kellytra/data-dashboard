@@ -189,6 +189,8 @@ bar_fig.add_trace(go.Bar(
     x=df.index,
     y=df["Cleaning cost (€)"],
     name="Cleaning cost (€)", 
+    text=df["Cleaning cost (€)"].round(2),
+    textposition="outside",
     marker_color="#2E8B57"
 ))
 
@@ -196,6 +198,8 @@ bar_fig.add_trace(go.Bar(
     x=df.index,
     y=df["DQ waste (€)"],
     name="DQ waste (€)",
+    text=df["DQ waste (€)"].round(2),
+    textposition="outside",
     marker_color="#CD5C5C" 
 ))
 

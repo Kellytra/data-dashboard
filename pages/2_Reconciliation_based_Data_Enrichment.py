@@ -2,14 +2,14 @@
 import pandas as pd
 import plotly.graph_objects as go
 
-st.set_page_config(page_title="Pairwise vs Reconciliation", layout="wide")
+st.set_page_config(page_title="Reconciliation-based Data Enrichment", layout="wide")
 
-st.title("Example 2: Pairwise-based vs Reconciliation-based")
+st.title("Example 2: Reconciliation-based Data Enrichment")
 st.caption(
     "A dashboard comparing pairwise-based and reconciliation-based enrichment for linking city names to coordinates."
 )
 
-st.sidebar.header("Pairwise vs Reconciliation Parameters")
+st.sidebar.header("Reconciliation-based Data Enrichment Parameters")
 
 
 dataset_size = st.sidebar.number_input(
@@ -182,7 +182,7 @@ def calculate_strategy(strategy_name, is_pairwise):
         "Time (min)": time_min,
         "Latency to result (sec)": latency_sec,
         "CO₂ (kg)": co2,
-        "Human work (min)": manual_work_min,
+        "Manual work (min)": manual_work_min,
     }
 
 
@@ -222,56 +222,38 @@ col4.metric("Operations avoided", f"{operations_avoided:,.0f}")
 st.subheader("Raw values")
 st.dataframe(df.round(4), use_container_width=True)
 
-# Normalized bar chart
 
-st.subheader("Normalized comparison")
-
-bar_metrics = [
-    "Improvement cost (€)",
-    "Total cost (€)",
-    "DQ waste (€)",
-    "DQ improvement",
-    "Time (min)",
-    "CO₂ (kg)",
-    "Latency to result (sec)"
-]
-
-normalized_df = df[bar_metrics].copy()
-
-for column in bar_metrics:
-    max_value = normalized_df[column].max()
-
-    if max_value == 0:
-        normalized_df[column] = 0
-    else:
-        normalized_df[column] = normalized_df[column] / max_value * 100
+# Bar chart
+st.subheader("Cost and DQ waste comparison")
 
 bar_fig = go.Figure()
 
-for metric in bar_metrics:
-    bar_fig.add_trace(go.Bar(
-        x=normalized_df.index,
-        y=normalized_df[metric],
-        name=metric,
-        text=normalized_df[metric].round(1),
-        textposition="outside"
-    ))
+bar_fig.add_trace(go.Bar(
+    x=df.index,
+    y=df["Improvement cost (€)"],
+    name="Improvement cost (€)",
+    text=df["Improvement cost (€)"].round(2),
+    textposition="outside",
+    marker_color="#2E8B57"
+))
+
+bar_fig.add_trace(go.Bar(
+    x=df.index,
+    y=df["DQ waste (€)"],
+    name="DQ waste (€)",
+    text=df["DQ waste (€)"].round(2),
+    textposition="outside",
+    marker_color="#CD5C5C"
+))
 
 bar_fig.update_layout(
     barmode="group",
-    title="Normalized comparison across cost, quality, time, CO₂ and latency",
-    yaxis_title="Normalized value (0-100)",
-    height=500
+    title="Improvement cost and DQ waste",
+    yaxis_title="€",
+    height=450
 )
 
 st.plotly_chart(bar_fig, use_container_width=True)
-
-st.caption(
-    "The bar chart is normalized from 0 to 100. "
-    "For each metric, 100 represents the highest value among the compared strategies. "
-    "Higher values mean higher raw values, not necessarily better performance."
-)
-
 
 # Spider chart
 
@@ -424,13 +406,13 @@ DQ waste is the cost spent on enrichment attempts that do not succeed.
 
 `CO2 = time_min * co2_per_minute`
 
-### Human work
+### manual work
 
 Pairwise includes manual work.
 
 Reconciliation has:
 
-`human_work = 0`
+`manual_work = 0`
 
 ---
 
@@ -465,5 +447,5 @@ Pairwise usually has more operations, higher latency, and more manual work.
 
 Reconciliation usually has fewer operations and no manual assessment work.
 
-The best strategy depends on the balance between quality, cost, waste, time, CO2, latency, and human involvement.
+The best strategy depends on the balance between quality, cost, waste, time, CO2, latency, and manual involvement.
 """)

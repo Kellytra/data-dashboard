@@ -193,13 +193,6 @@ def normalize(value, max_value):
         return 0
     return value / max_value * 100
 
-
-def normalize_log(value, max_value):
-    if max_value == 0:
-        return 0
-    return np.log1p(value) / np.log1p(max_value) * 100
-
-
 radar_df = pd.DataFrame(index=spider_df.index)
 
 for column in spider_df.columns:

@@ -9,9 +9,7 @@ st.caption(
     "A comparison between a complete data preparation pipeline and a reduced partial pipeline."
 )
 
-# ------------------------------------------------------------
 # Sidebar inputs
-# ------------------------------------------------------------
 
 st.sidebar.header("Input parameters")
 
@@ -91,9 +89,7 @@ human_work_per_row = st.sidebar.number_input(
     format="%.5f"
 )
 
-# ------------------------------------------------------------
 # Calculations
-# ------------------------------------------------------------
 
 problematic_rows = dataset_size * problematic_records_percent / 100
 
@@ -106,11 +102,17 @@ complete_steps = 2
 # Step 1: imputation only
 partial_steps = 1
 
+complete_processed_amount = problematic_rows * complete_steps
+partial_processed_amount = problematic_rows * partial_steps
+
 complete_dq_improvement = problematic_rows * complete_effectiveness
 partial_dq_improvement = problematic_rows * partial_effectiveness
 
 complete_dq_improvement_cost = problematic_rows * cost_per_row * complete_steps
 partial_dq_improvement_cost = problematic_rows * cost_per_row * partial_steps
+
+complete_dq_waste = complete_dq_improvement_cost * (1 - complete_effectiveness)
+partial_dq_waste = partial_dq_improvement_cost * (1 - partial_effectiveness)
 
 cost_saving = complete_dq_improvement_cost - partial_dq_improvement_cost
 
@@ -121,6 +123,9 @@ else:
 
 complete_time = problematic_rows * time_per_row * complete_steps
 partial_time = problematic_rows * time_per_row * partial_steps
+
+complete_latency = complete_time
+partial_latency = partial_time
 
 complete_energy = problematic_rows * energy_per_row * complete_steps
 partial_energy = problematic_rows * energy_per_row * partial_steps
@@ -136,9 +141,7 @@ energy_saved = complete_energy - partial_energy
 co2_saved = complete_co2 - partial_co2
 human_work_saved = complete_human_work - partial_human_work
 
-# ------------------------------------------------------------
 # DataFrame
-# ------------------------------------------------------------
 
 df = pd.DataFrame({
     "Pipeline": ["Complete pipeline", "Partial pipeline"],
@@ -148,21 +151,22 @@ df = pd.DataFrame({
     ],
     "Improvement steps": [complete_steps, partial_steps],
     "Problematic rows": [problematic_rows, problematic_rows],
+    "Processed amount": [complete_processed_amount, partial_processed_amount],
     "Effectiveness": [complete_effectiveness, partial_effectiveness],
     "DQ improvement": [complete_dq_improvement, partial_dq_improvement],
     "DQ improvement cost (€)": [
         complete_dq_improvement_cost,
         partial_dq_improvement_cost
     ],
+    "DQ waste (€)": [complete_dq_waste, partial_dq_waste],
     "Processing time (s)": [complete_time, partial_time],
+    "Latency to result (sec)": [complete_latency, partial_latency],
     "Energy use (kWh)": [complete_energy, partial_energy],
     "CO₂ emissions (kg)": [complete_co2, partial_co2],
     "Human work (min)": [complete_human_work, partial_human_work],
 })
 
-# ------------------------------------------------------------
 # Key metrics
-# ------------------------------------------------------------
 
 st.subheader("Key results")
 
@@ -191,126 +195,125 @@ col4.metric(
 
 st.dataframe(df, use_container_width=True)
 
+# Normalized bar chart
 
-# ------------------------------------------------------------
-# Combined chart: DQ improvement, cost, saving and steps
-# ------------------------------------------------------------
+st.subheader("Normalized pipeline comparison")
 
-st.subheader("Pipeline comparison")
-
-fig_comparison = go.Figure()
-
-fig_comparison.add_trace(go.Bar(
-    name="DQ improvement",
-    x=["Complete pipeline", "Partial pipeline"],
-    y=[complete_dq_improvement, partial_dq_improvement],
-    text=[
-        round(complete_dq_improvement, 0),
-        round(partial_dq_improvement, 0)
-    ],
-    textposition="auto"
-))
-
-fig_comparison.add_trace(go.Bar(
-    name="DQ improvement cost (€)",
-    x=["Complete pipeline", "Partial pipeline"],
-    y=[complete_dq_improvement_cost, partial_dq_improvement_cost],
-    text=[
-        round(complete_dq_improvement_cost, 2),
-        round(partial_dq_improvement_cost, 2)
-    ],
-    textposition="auto"
-))
-
-fig_comparison.add_trace(go.Bar(
-    name="Cost saving (€)",
-    x=["Complete pipeline", "Partial pipeline"],
-    y=[0, cost_saving],
-    text=[
-        0,
-        round(cost_saving, 2)
-    ],
-    textposition="auto"
-))
-
-fig_comparison.add_trace(go.Bar(
-    name="Improvement steps",
-    x=["Complete pipeline", "Partial pipeline"],
-    y=[complete_steps, partial_steps],
-    text=[
-        complete_steps,
-        partial_steps
-    ],
-    textposition="auto"
-))
-
-fig_comparison.update_layout(
-    barmode="group",
-    xaxis_title="Pipeline",
-    yaxis_title="Value"
-)
-
-st.plotly_chart(fig_comparison, use_container_width=True)
-
-
-# ------------------------------------------------------------
-# Spider chart
-# ------------------------------------------------------------
-
-st.subheader("Spider chart")
-
-spider_metrics = [
+bar_metrics = [
     "DQ improvement",
     "DQ improvement cost (€)",
+    "DQ waste (€)",
     "Processing time (s)",
+    "Latency to result (sec)",
     "Energy use (kWh)",
     "CO₂ emissions (kg)",
     "Human work (min)"
 ]
 
-spider_df = df[["Pipeline"] + spider_metrics].copy()
+normalized_df = df[["Pipeline"] + bar_metrics].copy()
 
-# Normalize all metrics to make them comparable in one spider chart.
-# For each metric, the highest value becomes 100.
-for metric in spider_metrics:
-    max_value = spider_df[metric].max()
+for metric in bar_metrics:
+    max_value = normalized_df[metric].max()
 
-    if max_value > 0:
-        spider_df[metric] = spider_df[metric] / max_value * 100
+    if max_value == 0:
+        normalized_df[metric] = 0
     else:
-        spider_df[metric] = 0
+        normalized_df[metric] = normalized_df[metric] / max_value * 100
 
-fig_spider = go.Figure()
+bar_fig = go.Figure()
 
-for _, row in spider_df.iterrows():
-    fig_spider.add_trace(go.Scatterpolar(
-        r=[row[metric] for metric in spider_metrics],
-        theta=spider_metrics,
-        fill="toself",
-        name=row["Pipeline"]
+for metric in bar_metrics:
+    bar_fig.add_trace(go.Bar(
+        x=normalized_df.index,
+        y=normalized_df[metric],
+        name=metric,
+        text=normalized_df[metric].round(1),
+        textposition="outside"
     ))
 
-fig_spider.update_layout(
+bar_fig.update_layout(
+    barmode="group",
+    title="Normalized comparison across quality, cost, time, energy, CO₂ and human work",
+    xaxis_title="Pipeline",
+    yaxis_title="Normalized value (0–100)",
+    height=500
+)
+
+st.plotly_chart(bar_fig, use_container_width=True)
+
+st.caption(
+    "The bar chart is normalized from 0 to 100. "
+    "For each metric, 100 represents the highest value among the compared pipelines. "
+    "Higher values mean higher raw values, not necessarily better performance."
+)
+
+
+# Spider chart
+
+st.subheader("Spider diagram")
+
+spider_df = pd.DataFrame(index=df.index)
+
+spider_df["Cost"] = df["DQ improvement cost (€)"]
+spider_df["DQ waste"] = df["DQ waste (€)"]
+spider_df["Time"] = df["Processing time (s)"]
+spider_df["CO₂"] = df["CO₂ emissions (kg)"]
+spider_df["Latency"] = df["Latency to result (sec)"]
+spider_df["Processed amount"] = df["Processed amount"]
+
+
+# spider_df["Energy"] = df["Energy use (kWh)"]
+# spider_df["DQ improvement"] = df["DQ improvement"]
+
+def normalize(value, max_value):
+    if max_value == 0:
+        return 0
+    return value / max_value * 100
+
+
+radar_df = pd.DataFrame(index=spider_df.index)
+
+for column in spider_df.columns:
+    radar_df[column] = spider_df[column].apply(
+        lambda x: normalize(x, spider_df[column].max())
+    )
+
+categories = list(radar_df.columns)
+
+fig = go.Figure()
+
+for strategy in radar_df.index:
+    values = radar_df.loc[strategy].tolist()
+
+    fig.add_trace(go.Scatterpolar(
+        r=values + [values[0]],
+        theta=categories + [categories[0]],
+        fill="toself",
+        name=strategy
+    ))
+
+fig.update_layout(
     polar=dict(
         radialaxis=dict(
             visible=True,
             range=[0, 100]
         )
     ),
-    showlegend=True
+    showlegend=True,
+    title="Normalized comparison: higher values are farther from the center",
+    height=500
 )
 
-st.plotly_chart(fig_spider, use_container_width=True)
+st.plotly_chart(fig, use_container_width=True)
 
-st.info(
-    "In the spider chart, all values are normalized from 0 to 100. "
-    "A higher value means more of that metric. For cost, time, energy, CO₂ and human work, lower is better. "
-    "For DQ improvement, higher is better."
+st.caption(
+    "The spider diagram shows normalized raw metric values. "
+    "Values farther from the center are higher, but not necessarily better."
 )
 
-# ------------------------------------------------------------
+
+
 # Explanation
-# ------------------------------------------------------------
 
 
 
@@ -496,6 +499,26 @@ Using the default values:
 `DQ improvement cost partial = €80`
 
 The partial pipeline is cheaper because it skips the outlier detection/correction step.
+""")
+
+    st.markdown("""
+### DQ waste
+
+DQ waste represents the part of the data quality improvement cost that does not lead to successful improvement.
+
+The formula is:
+
+`DQ waste = DQ improvement cost × (1 - effectiveness)`
+
+For the complete pipeline:
+
+`DQ waste complete = complete_dq_improvement_cost × (1 - complete_effectiveness)`
+
+For the partial pipeline:
+
+`DQ waste partial = partial_dq_improvement_cost × (1 - partial_effectiveness)`
+
+Lower DQ waste is better.
 """)
 
     st.markdown("""

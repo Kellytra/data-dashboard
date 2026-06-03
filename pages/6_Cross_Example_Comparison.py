@@ -9,9 +9,8 @@ st.caption(
     "Comparison of the five examples based on absolute savings and percentage improvements."
 )
 
-# ------------------------------------------------------------
 # Helper functions
-# ------------------------------------------------------------
+
 
 def percentage_reduction(baseline_value, improved_value):
     if baseline_value == 0:
@@ -26,13 +25,13 @@ def calculate_savings(example_name, baseline_name, improved_name, baseline, impr
         "Improved strategy": improved_name,
 
         # Absolute values
-        "Baseline cost (€)": baseline["cost"],
-        "Improved cost (€)": improved["cost"],
-        "Cost saved (€)": baseline["cost"] - improved["cost"],
+        "Baseline cost (EUR)": baseline["cost"],
+        "Improved cost (EUR)": improved["cost"],
+        "Cost saved (EUR)": baseline["cost"] - improved["cost"],
 
-        "Baseline DQ waste (€)": baseline["dq_waste"],
-        "Improved DQ waste (€)": improved["dq_waste"],
-        "DQ waste reduced (€)": baseline["dq_waste"] - improved["dq_waste"],
+        "Baseline DQ waste (EUR)": baseline["dq_waste"],
+        "Improved DQ waste (EUR)": improved["dq_waste"],
+        "DQ waste reduced (EUR)": baseline["dq_waste"] - improved["dq_waste"],
 
         "Baseline time (min)": baseline["time_min"],
         "Improved time (min)": improved["time_min"],
@@ -42,22 +41,22 @@ def calculate_savings(example_name, baseline_name, improved_name, baseline, impr
         "Improved latency (sec)": improved["latency_sec"],
         "Latency reduced (sec)": baseline["latency_sec"] - improved["latency_sec"],
 
-        "Baseline CO₂ (kg)": baseline["co2"],
-        "Improved CO₂ (kg)": improved["co2"],
-        "CO₂ saved (kg)": baseline["co2"] - improved["co2"],
+        "Baseline CO2 (kg)": baseline["co2"],
+        "Improved CO2 (kg)": improved["co2"],
+        "CO2 saved (kg)": baseline["co2"] - improved["co2"],
 
         # Percentage improvements
         "Cost reduction (%)": percentage_reduction(baseline["cost"], improved["cost"]),
         "DQ waste reduction (%)": percentage_reduction(baseline["dq_waste"], improved["dq_waste"]),
         "Time reduction (%)": percentage_reduction(baseline["time_min"], improved["time_min"]),
         "Latency reduction (%)": percentage_reduction(baseline["latency_sec"], improved["latency_sec"]),
-        "CO₂ reduction (%)": percentage_reduction(baseline["co2"], improved["co2"]),
+        "CO2 reduction (%)": percentage_reduction(baseline["co2"], improved["co2"]),
     }
 
 
-# ------------------------------------------------------------
+
 # Sidebar
-# ------------------------------------------------------------
+
 
 st.sidebar.header("Cross-comparison settings")
 
@@ -71,13 +70,14 @@ The comparison uses one baseline strategy and one improved strategy for each exa
 show_absolute_values = st.sidebar.checkbox("Show absolute values table", value=True)
 show_percentage_values = st.sidebar.checkbox("Show percentage improvement table", value=True)
 show_strategy_overview = st.sidebar.checkbox("Show strategy overview", value=True)
+show_spider_charts = st.sidebar.checkbox("Show spider diagrams", value=True)
 
 
-# ------------------------------------------------------------
+
 # Example 1: Progressive Visualization
 # Baseline: Bulk
 # Improved: Progressive
-# ------------------------------------------------------------
+
 
 # Default parameters from Example 1
 dataset_size_1 = 51305
@@ -130,11 +130,10 @@ example_1_baseline = example_1_strategy(perc=1.0, is_progressive=False)
 example_1_improved = example_1_strategy(perc=error_rate_1, is_progressive=True)
 
 
-# ------------------------------------------------------------
 # Example 2: Reconciliation-based Data Enrichment
 # Baseline: Pairwise-based
 # Improved: Reconciliation-based
-# ------------------------------------------------------------
+
 
 dataset_size_2 = 6419
 candidates_per_record_2 = 50
@@ -184,11 +183,10 @@ example_2_baseline = example_2_strategy(is_pairwise=True)
 example_2_improved = example_2_strategy(is_pairwise=False)
 
 
-# ------------------------------------------------------------
 # Example 3: Cleaning on Demand
 # Baseline: Full Cleaning
 # Improved: On-Demand Cleaning
-# ------------------------------------------------------------
+
 
 dataset_size_3 = 200000
 query_relevant_percent_3 = 15
@@ -231,11 +229,11 @@ example_3_baseline = example_3_strategy(perc=1.0)
 example_3_improved = example_3_strategy(perc=query_relevant_rate_3)
 
 
-# ------------------------------------------------------------
+
 # Example 4: Cleaning and Enrichment of Dynamic Data
 # Baseline: Static Retrieval with Pre-cleaning
 # Improved: Progressive Retrieval with On-demand Cleaning
-# ------------------------------------------------------------
+
 
 candidate_tables_4 = 500
 rows_per_table_4 = 400
@@ -287,11 +285,11 @@ example_4_improved = example_4_strategy(
 )
 
 
-# ------------------------------------------------------------
+
 # Example 5: Data Preparation Pipelines Improvement
 # Baseline: Complete pipeline
 # Improved: Partial pipeline
-# ------------------------------------------------------------
+
 
 dataset_size_5 = 200000
 problematic_records_percent_5 = 20
@@ -336,9 +334,8 @@ example_5_improved = example_5_strategy(
 )
 
 
-# ------------------------------------------------------------
 # Combined comparison data
-# ------------------------------------------------------------
+
 
 comparison_rows = [
     calculate_savings(
@@ -381,9 +378,7 @@ comparison_rows = [
 comparison_df = pd.DataFrame(comparison_rows)
 
 
-# ------------------------------------------------------------
 # Page content
-# ------------------------------------------------------------
 
 st.subheader("Strategy overview")
 
@@ -397,32 +392,28 @@ if show_strategy_overview:
 st.markdown(
     """
 The comparison uses the first strategy in each example as the baseline and the second strategy as the improved alternative.
-The percentage improvements show how much the improved strategy reduces cost, waste, time, latency, and CO₂ compared with its own baseline.
+The percentage improvements show how much the improved strategy reduces cost, waste, time, latency, and CO2 compared with its own baseline.
 """
 )
 
-# ------------------------------------------------------------
 # KPI cards
-# ------------------------------------------------------------
+
 
 st.subheader("Average percentage improvements across examples")
 
 avg_cost_reduction = comparison_df["Cost reduction (%)"].mean()
 avg_waste_reduction = comparison_df["DQ waste reduction (%)"].mean()
 avg_time_reduction = comparison_df["Time reduction (%)"].mean()
-avg_co2_reduction = comparison_df["CO₂ reduction (%)"].mean()
+avg_co2_reduction = comparison_df["CO2 reduction (%)"].mean()
 
 col1, col2, col3, col4 = st.columns(4)
 
 col1.metric("Avg. cost reduction", f"{avg_cost_reduction:.1f}%")
 col2.metric("Avg. DQ waste reduction", f"{avg_waste_reduction:.1f}%")
 col3.metric("Avg. time reduction", f"{avg_time_reduction:.1f}%")
-col4.metric("Avg. CO₂ reduction", f"{avg_co2_reduction:.1f}%")
+col4.metric("Avg. CO reduction", f"{avg_co2_reduction:.1f}%")
 
-
-# ------------------------------------------------------------
 # Percentage improvement chart
-# ------------------------------------------------------------
 
 st.subheader("Percentage improvements by example")
 
@@ -431,7 +422,7 @@ percentage_metrics = [
     "DQ waste reduction (%)",
     "Time reduction (%)",
     "Latency reduction (%)",
-    "CO₂ reduction (%)",
+    "CO2 reduction (%)",
 ]
 
 selected_percentage_metrics = st.multiselect(
@@ -441,7 +432,7 @@ selected_percentage_metrics = st.multiselect(
         "Cost reduction (%)",
         "DQ waste reduction (%)",
         "Time reduction (%)",
-        "CO₂ reduction (%)",
+        "CO2 reduction (%)",
     ],
 )
 
@@ -468,9 +459,9 @@ percentage_fig.update_layout(
 st.plotly_chart(percentage_fig, use_container_width=True)
 
 
-# ------------------------------------------------------------
+
+
 # Tables
-# ------------------------------------------------------------
 
 if show_percentage_values:
     st.subheader("Percentage improvement table")
@@ -482,7 +473,7 @@ if show_percentage_values:
             "DQ waste reduction (%)",
             "Time reduction (%)",
             "Latency reduction (%)",
-            "CO₂ reduction (%)",
+            "CO2 reduction (%)",
         ]
     ].copy()
 
@@ -498,11 +489,11 @@ if show_absolute_values:
     absolute_savings_table = comparison_df[
         [
             "Example",
-            "Cost saved (€)",
-            "DQ waste reduced (€)",
+            "Cost saved (EUR)",
+            "DQ waste reduced (EUR)",
             "Time saved (min)",
             "Latency reduced (sec)",
-            "CO₂ saved (kg)",
+            "CO2 saved (kg)",
         ]
     ].copy()
 
@@ -517,16 +508,16 @@ if show_absolute_values:
     absolute_values_table = comparison_df[
         [
             "Example",
-            "Baseline cost (€)",
-            "Improved cost (€)",
-            "Baseline DQ waste (€)",
-            "Improved DQ waste (€)",
+            "Baseline cost (EUR)",
+            "Improved cost (EUR)",
+            "Baseline DQ waste (EUR)",
+            "Improved DQ waste (EUR)",
             "Baseline time (min)",
             "Improved time (min)",
             "Baseline latency (sec)",
             "Improved latency (sec)",
-            "Baseline CO₂ (kg)",
-            "Improved CO₂ (kg)",
+            "Baseline CO2 (kg)",
+            "Improved CO2 (kg)",
         ]
     ].copy()
 
@@ -537,9 +528,88 @@ if show_absolute_values:
     )
 
 
-# ------------------------------------------------------------
+
+# Spider charts by example
+
+
+def create_example_spider(row):
+    metrics = [
+        ("Cost", next(column for column in row.index if column.startswith("Baseline cost")),
+         next(column for column in row.index if column.startswith("Improved cost"))),
+        ("DQ waste", next(column for column in row.index if column.startswith("Baseline DQ waste")),
+         next(column for column in row.index if column.startswith("Improved DQ waste"))),
+        ("Time", "Baseline time (min)", "Improved time (min)"),
+        ("Latency", "Baseline latency (sec)", "Improved latency (sec)"),
+        ("CO2", next(column for column in row.index if column.startswith("Baseline CO")),
+         next(column for column in row.index if column.startswith("Improved CO"))),
+    ]
+
+    categories = [metric[0] for metric in metrics]
+    baseline_values = []
+    improved_values = []
+
+    for _, baseline_column, improved_column in metrics:
+        max_value = max(row[baseline_column], row[improved_column])
+
+        if max_value == 0:
+            baseline_values.append(0)
+            improved_values.append(0)
+        else:
+            baseline_values.append(row[baseline_column] / max_value * 100)
+            improved_values.append(row[improved_column] / max_value * 100)
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatterpolar(
+        r=baseline_values + [baseline_values[0]],
+        theta=categories + [categories[0]],
+        fill="toself",
+        name=row["Baseline strategy"],
+    ))
+
+    fig.add_trace(go.Scatterpolar(
+        r=improved_values + [improved_values[0]],
+        theta=categories + [categories[0]],
+        fill="toself",
+        name=row["Improved strategy"],
+    ))
+
+    fig.update_layout(
+        polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+        showlegend=True,
+        title=row["Example"].replace("Example ", "Ex. "),
+        height=300,
+        margin=dict(l=15, r=15, t=55, b=20),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.35,
+            xanchor="center",
+            x=0.5,
+        ),
+    )
+
+    return fig
+
+
+if show_spider_charts:
+    st.subheader("Spider diagrams by example")
+
+    st.caption(
+        "Each spider diagram compares the baseline strategy with the improved strategy "
+        "inside the same example. Values are normalized within each example."
+    )
+
+    spider_cols = st.columns(5)
+
+    for col, (_, row) in zip(spider_cols, comparison_df.iterrows()):
+        col.plotly_chart(create_example_spider(row), use_container_width=True)
+
+
+
+
 # Explanation
-# ------------------------------------------------------------
+
 
 with st.expander("Explanation of the cross-example comparison"):
     st.markdown("""
@@ -569,7 +639,7 @@ Each example is converted into a two-strategy comparison:
 
 For each metric, the percentage reduction is calculated as:
 
-`Reduction (%) = (baseline value - improved value) / baseline value × 100`
+`Reduction (%) = (baseline value - improved value) / baseline value  100`
 
 This is used for:
 
@@ -577,7 +647,7 @@ This is used for:
 - DQ waste reduction
 - Time reduction
 - Latency reduction
-- CO₂ reduction
+- CO reduction
 
 ---
 
@@ -593,7 +663,7 @@ Using percentage improvements makes the examples easier to compare because each 
 
 Higher percentage reduction means that the improved strategy reduces that metric more strongly compared with the baseline.
 
-For these metrics, higher reduction is better because lower cost, waste, time, latency, and CO₂ are desirable.
+For these metrics, higher reduction is better because lower cost, waste, time, latency, and CO2 are desirable.
 
 ---
 

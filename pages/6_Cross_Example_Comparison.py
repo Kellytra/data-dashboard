@@ -639,7 +639,7 @@ Each example is converted into a two-strategy comparison:
 
 For each metric, the percentage reduction is calculated as:
 
-`Reduction (%) = (baseline value - improved value) / baseline value  100`
+`Reduction (%) = (baseline value - improved value) / baseline value × 100`
 
 This is used for:
 
@@ -647,7 +647,7 @@ This is used for:
 - DQ waste reduction
 - Time reduction
 - Latency reduction
-- CO reduction
+- CO₂ reduction
 
 ---
 
@@ -663,7 +663,7 @@ Using percentage improvements makes the examples easier to compare because each 
 
 Higher percentage reduction means that the improved strategy reduces that metric more strongly compared with the baseline.
 
-For these metrics, higher reduction is better because lower cost, waste, time, latency, and CO2 are desirable.
+For these metrics, higher reduction is better because lower cost, waste, time, latency, and CO₂ are desirable.
 
 ---
 

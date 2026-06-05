@@ -577,13 +577,12 @@ def create_example_spider(row):
     fig.update_layout(
         polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
         showlegend=True,
-        title=row["Example"].replace("Example ", "Ex. "),
-        height=300,
-        margin=dict(l=15, r=15, t=55, b=20),
+        height=360,
+        margin=dict(l=25, r=25, t=25, b=40),
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=-0.35,
+            y=-0.28,
             xanchor="center",
             x=0.5,
         ),
@@ -600,10 +599,17 @@ if show_spider_charts:
         "inside the same example. Values are normalized within each example."
     )
 
-    spider_cols = st.columns(5)
+    spider_rows = [
+        comparison_df.iloc[start:start + 2]
+        for start in range(0, len(comparison_df), 2)
+    ]
 
-    for col, (_, row) in zip(spider_cols, comparison_df.iterrows()):
-        col.plotly_chart(create_example_spider(row), use_container_width=True)
+    for spider_row in spider_rows:
+        spider_cols = st.columns(len(spider_row))
+
+        for col, (_, row) in zip(spider_cols, spider_row.iterrows()):
+            col.markdown(f"**{row['Example'].replace('Example ', 'Ex. ')}**")
+            col.plotly_chart(create_example_spider(row), use_container_width=True)
 
 
 

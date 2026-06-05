@@ -10,6 +10,13 @@ This dashboard explores sustainability trade-offs in data preparation.
 Each page models one example scenario and compares alternative methods using shared indicators such as cost, CO₂, processing time, latency, DQ waste, and processed amount.
 """)
 
+st.subheader("Reference paper")
+
+st.markdown(
+    "The examples in this dashboard are based on the paper "
+    "[Sustainable Data Preparation](https://dl.acm.org/doi/full/10.1145/3769120)."
+)
+
 st.subheader("How to use the dashboard")
 
 st.markdown("""

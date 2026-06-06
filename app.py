@@ -15,6 +15,8 @@ st.subheader("Project information")
 st.markdown("""
 This dashboard was developed as a spring semester 2026 project by Jenny Nguyen and Kelly Tran, exchange students from Norway at Politecnico di Milano.
 
+The project belongs to the course 089020 - Project in Computer Science and Engineering.
+
 The project was supervised by Professor Barbara Pernici at Politecnico di Milano, Milan, Italy.
 """)
 

@@ -10,6 +10,14 @@ This dashboard explores sustainability trade-offs in data preparation.
 Each page models one example scenario and compares alternative methods using shared indicators such as cost, CO₂, processing time, latency, DQ waste, and processed amount.
 """)
 
+st.subheader("Project information")
+
+st.markdown("""
+This dashboard was developed as a spring semester 2026 project by Jenny Nguyen and Kelly Tran, exchange students from Norway at Politecnico di Milano.
+
+The project was supervised by Professor Barbara Pernici at Politecnico di Milano, Milan, Italy.
+""")
+
 st.subheader("Reference paper")
 
 st.markdown(
